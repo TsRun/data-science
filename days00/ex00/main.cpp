@@ -20,7 +20,6 @@ int	main()
 		std::cout << "Loan 100 to account 1 :" << std::endl;
 		std::cout << bank << std::endl;
 
-		// Test operator[]
 		std::cout << "Accessing Account 1 via operator[] :" << std::endl;
 		std::cout << bank[1] << std::endl;
 

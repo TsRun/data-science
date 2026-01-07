@@ -1,15 +1,10 @@
 #include "Graph.hpp"
 #include <iostream>
-#include <cmath> // for comparison if needed, though exact plot expected
-
-#include "Graph.hpp"
-#include <iostream>
 #include <fstream>
 #include <cmath>
 #include <vector>
 #include <stdint.h>
 
-// Helper functions for PNG generation (no external libs)
 namespace PngUtils
 {
 	static uint32_t	crc_table[256];
@@ -126,17 +121,9 @@ void	Graph::readFromFile(const char *filename)
 
 void	Graph::display() const
 {
-	// Check if we have lines to draw on console (limited resolution)
-	// Usually console ASCII art only draws points correctly.
-	// Lines in ASCII are complex, skipping for ASCII for simplicity unless requested.
-	// The prompt asked for "Add a line feature", usually implies memory storage + PNG.
-	// We will keep ASCII display strictly for points as requested originally.
-
-	// Y axis from Size down to 0
 	for (int y = (int)_size.getY() - 1; y >= 0; --y)
 	{
 		std::cout << "& " << y << " ";
-		// X axis from 0 to Size
 		for (int x = 0; x < (int)_size.getX(); ++x)
 		{
 			bool found = false;
@@ -156,7 +143,6 @@ void	Graph::display() const
 		std::cout << std::endl;
 	}
 	
-	// X axis label
 	std::cout << "&   "; 
 	for (int x = 0; x < (int)_size.getX(); ++x)
 	{
@@ -165,7 +151,6 @@ void	Graph::display() const
 	std::cout << std::endl;
 }
 
-// Bresenham's line algorithm
 static void drawLineGeneric(std::vector<unsigned char>& pixels, int w, int h, int x0, int y0, int x1, int y1, unsigned char r, unsigned char g, unsigned char b)
 {
 	int dx = std::abs(x1 - x0);
@@ -178,7 +163,6 @@ static void drawLineGeneric(std::vector<unsigned char>& pixels, int w, int h, in
 	{
 		if (x0 >= 0 && x0 < w && y0 >= 0 && y0 < h)
 		{
-			// Pixel index (row-major top-left origin)
 			int idx = (y0 * w + x0) * 3;
 			pixels[idx] = r;
 			pixels[idx + 1] = g;
@@ -191,21 +175,19 @@ static void drawLineGeneric(std::vector<unsigned char>& pixels, int w, int h, in
 	}
 }
 
-// Minimal Number Drawing (3x5 font)
 static void drawDigit(std::vector<unsigned char>& pixels, int w, int h, int x, int y, int digit)
 {
-	// 3x5 bitmasks
 	static const unsigned char font[10][5] = {
-		{7, 5, 5, 5, 7}, // 0
-		{2, 6, 2, 2, 7}, // 1
-		{7, 1, 7, 4, 7}, // 2
-		{7, 1, 7, 1, 7}, // 3
-		{5, 5, 7, 1, 1}, // 4
-		{7, 4, 7, 1, 7}, // 5
-		{7, 4, 7, 5, 7}, // 6
-		{7, 1, 1, 2, 2}, // 7
-		{7, 5, 7, 5, 7}, // 8
-		{7, 5, 7, 1, 7}  // 9
+		{7, 5, 5, 5, 7}, 
+		{2, 6, 2, 2, 7}, 
+		{7, 1, 7, 4, 7}, 
+		{7, 1, 7, 1, 7}, 
+		{5, 5, 7, 1, 1}, 
+		{7, 4, 7, 1, 7}, 
+		{7, 4, 7, 5, 7}, 
+		{7, 1, 1, 2, 2}, 
+		{7, 5, 7, 5, 7}, 
+		{7, 5, 7, 1, 7}  
 	};
 	
 	if (digit < 0 || digit > 9) return;
@@ -214,7 +196,6 @@ static void drawDigit(std::vector<unsigned char>& pixels, int w, int h, int x, i
 	{
 		for (int col = 0; col < 3; ++col)
 		{
-			// Check bit (from left to right, bit 2 to 0)
 			if ((font[digit][row] >> (2 - col)) & 1)
 			{
 				int px = x + col;
@@ -224,7 +205,7 @@ static void drawDigit(std::vector<unsigned char>& pixels, int w, int h, int x, i
 					int idx = (py * w + px) * 3;
 					pixels[idx] = 0;
 					pixels[idx+1] = 0;
-					pixels[idx+2] = 0; // Black text
+					pixels[idx+2] = 0; 
 				}
 			}
 		}
@@ -238,75 +219,51 @@ static void drawNumber(std::vector<unsigned char>& pixels, int w, int h, int x, 
 		drawDigit(pixels, w, h, x, y, 0);
 		return;
 	}
-	// Simple support for single/double digits for now
-	std::string s = std::to_string(number); // Wait, C++98 doesn't have to_string easily?
-	// Fallback for C++98
 	char buf[16];
 	snprintf(buf, sizeof(buf), "%d", number);
 	int offset = 0;
 	for (int i=0; buf[i]; i++)
 	{
 		drawDigit(pixels, w, h, x + offset, y, buf[i] - '0');
-		offset += 4; // 3 width + 1 spacing
+		offset += 4; 
 	}
 }
 
 void	Graph::saveToPNG(const char *filename) const
 {
-	// 1. Prepare raw pixel buffer (RGB)
 	int scale = 40;
-	// Increase layout:
-	// Need left margin for Y axis, bottom margin for X axis
 	int marginLeft = 30;
 	int marginBottom = 20;
 
-	// Grid Dimensions (Logic coords)
 	int logicW = (int)_size.getX();
 	int logicH = (int)_size.getY();
 
-	// Image Dimensions
-	int w = logicW * scale + marginLeft + scale; // + margin right
-	int h = logicH * scale + marginBottom + scale; // + margin top
+	int w = logicW * scale + marginLeft + scale; 
+	int h = logicH * scale + marginBottom + scale; 
 	
-	// Initialize white background (255)
 	std::vector<unsigned char> rawPixels(w * h * 3, 255);
 
-	// Coordinate systems:
-	// Logic (0,0) -> Pixel (marginLeft + scale/2, h - marginBottom - scale/2)
-	// Actually typical graph:
-	// (0,0) is bottom-left intersection.
-	// Let's place (0,0) at (marginLeft, h - marginBottom)
-	
 	int zeroX = marginLeft + 10;
 	int zeroY = h - marginBottom - 10;
 
-	// Draw Grid and Axes
 	for (int i = 0; i <= logicW; ++i)
 	{
 		int x = zeroX + i * scale;
-		// Grid line (Vertical) - Light Grey
 		drawLineGeneric(rawPixels, w, h, x, zeroY, x, zeroY - logicH * scale, 200, 200, 200);
-		// Axis Ticks
 		drawLineGeneric(rawPixels, w, h, x, zeroY, x, zeroY + 5, 0, 0, 0);
-		// Numbers
 		drawNumber(rawPixels, w, h, x - 3, zeroY + 8, i);
 	}
 	for (int j = 0; j <= logicH; ++j)
 	{
 		int y = zeroY - j * scale;
-		// Grid line (Horizontal) - Light Grey
 		drawLineGeneric(rawPixels, w, h, zeroX, y, zeroX + logicW * scale, y, 200, 200, 200);
-		// Axis Ticks
 		drawLineGeneric(rawPixels, w, h, zeroX, y, zeroX - 5, y, 0, 0, 0);
-		// Numbers
 		drawNumber(rawPixels, w, h, zeroX - 15, y - 2, j);
 	}
 
-	// Main Axes (Black)
-	drawLineGeneric(rawPixels, w, h, zeroX, zeroY, zeroX + logicW * scale, zeroY, 0, 0, 0); // X Axis
-	drawLineGeneric(rawPixels, w, h, zeroX, zeroY, zeroX, zeroY - logicH * scale, 0, 0, 0); // Y Axis
+	drawLineGeneric(rawPixels, w, h, zeroX, zeroY, zeroX + logicW * scale, zeroY, 0, 0, 0); 
+	drawLineGeneric(rawPixels, w, h, zeroX, zeroY, zeroX, zeroY - logicH * scale, 0, 0, 0); 
 
-	// Draw Lines (Content)
 	for (std::vector< std::pair<Vector2, Vector2> >::const_iterator it = _lines.begin(); it != _lines.end(); ++it)
 	{
 		int x0 = zeroX + (int)it->first.getX() * scale;
@@ -318,12 +275,11 @@ void	Graph::saveToPNG(const char *filename) const
 		drawLineGeneric(rawPixels, w, h, x0, y0, x1, y1, 0, 0, 0);
 	}
 
-	// Draw Points (Content)
 	for (std::vector<Vector2>::const_iterator it = _points.begin(); it != _points.end(); ++it)
 	{
 		int cx = zeroX + (int)it->getX() * scale;
 		int cy = zeroY - (int)it->getY() * scale;
-		int r = 5; // Radius
+		int r = 5; 
 		for (int dy = -r; dy <= r; dy++)
 		{
 			for (int dx = -r; dx <= r; dx++)
@@ -333,7 +289,7 @@ void	Graph::saveToPNG(const char *filename) const
 				if (px >= 0 && px < w && py >= 0 && py < h)
 				{
 					int idx = (py * w + px) * 3;
-					rawPixels[idx] = 255;   // Red
+					rawPixels[idx] = 255;   
 					rawPixels[idx + 1] = 0;
 					rawPixels[idx + 2] = 0;
 				}
@@ -348,28 +304,25 @@ void	Graph::saveToPNG(const char *filename) const
 		return;
 	}
 
-	// 2. PNG Signature
 	const unsigned char png_signature[] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 	file.write((char*)png_signature, 8);
 
-	// 3. IHDR Chunk
 	{
 		unsigned char ihdr[13];
 		PngUtils::bigEndian(w, ihdr);
 		PngUtils::bigEndian(h, ihdr + 4);
-		ihdr[8] = 8; // bit depth
-		ihdr[9] = 2; // color type (RGB truecolor)
-		ihdr[10] = 0; // compression
-		ihdr[11] = 0; // filter
-		ihdr[12] = 0; // interlace
+		ihdr[8] = 8; 
+		ihdr[9] = 2; 
+		ihdr[10] = 0; 
+		ihdr[11] = 0; 
+		ihdr[12] = 0; 
 		
 		unsigned char lengthBytes[4];
 		PngUtils::bigEndian(13, lengthBytes);
-		file.write((char*)lengthBytes, 4);        // Length
-		file.write("IHDR", 4);                    // Type
-		file.write((char*)ihdr, 13);              // Data
+		file.write((char*)lengthBytes, 4);        
+		file.write("IHDR", 4);                    
+		file.write((char*)ihdr, 13);              
 		
-		// CRC (Type + Data)
 		unsigned char crcData[17];
 		const char* type = "IHDR";
 		for(int i=0; i<4; i++) crcData[i] = type[i];
@@ -381,13 +334,11 @@ void	Graph::saveToPNG(const char *filename) const
 		file.write((char*)crcBytes, 4);
 	}
 
-	// 4. IDAT Chunk (Uncompressed ZLIB - DEFLATE Type 0)
 	{
-		// Format raw data: Each scanline must be preceded by a filter type (0).
 		std::vector<unsigned char> filteredData;
 		for (int y = 0; y < h; y++)
 		{
-			filteredData.push_back(0); // Filter None
+			filteredData.push_back(0); 
 			for (int x = 0; x < w; x++)
 			{
 				int idx = (y * w + x) * 3;
@@ -397,13 +348,9 @@ void	Graph::saveToPNG(const char *filename) const
 			}
 		}
 
-		// Prepare ZLIB stream structure
-		// Header (2) + DEFLATE Block (5 + Data) + Adler32 (4)
-		// DEFLATE stored block max size is 65535.
-		
 		std::vector<unsigned char> zlibData;
-		zlibData.push_back(0x78); // ZLIB Header CM=8, CINFO=7
-		zlibData.push_back(0x01); // Flags FLEVEL=0, FCHECK (so that 0x7801 is valid)
+		zlibData.push_back(0x78);
+		zlibData.push_back(0x01);
 
 		size_t pos = 0;
 		while (pos < filteredData.size())
@@ -412,11 +359,9 @@ void	Graph::saveToPNG(const char *filename) const
 			if (chunkSize > 65535) chunkSize = 65535;
 			bool last = (pos + chunkSize == filteredData.size());
 
-			// Deflate Block Header
-			unsigned char bType = last ? 0x01 : 0x00; // BFINAL=1/0, BTYPE=00 (stored)
+			unsigned char bType = last ? 0x01 : 0x00;
 			zlibData.push_back(bType);
 			
-			// LEN and NLEN (Little Endian)
 			uint16_t len = (uint16_t)chunkSize;
 			uint16_t nlen = ~len;
 			zlibData.push_back(len & 0xFF);
@@ -424,14 +369,12 @@ void	Graph::saveToPNG(const char *filename) const
 			zlibData.push_back(nlen & 0xFF);
 			zlibData.push_back((nlen >> 8) & 0xFF);
 
-			// Data
 			for (size_t i = 0; i < chunkSize; ++i)
 				zlibData.push_back(filteredData[pos + i]);
 			
 			pos += chunkSize;
 		}
 
-		// Adler32
 		uint32_t adler = PngUtils::adler32(&filteredData[0], filteredData.size());
 		unsigned char adlerBytes[4];
 		PngUtils::bigEndian(adler, adlerBytes);
@@ -440,15 +383,13 @@ void	Graph::saveToPNG(const char *filename) const
 		zlibData.push_back(adlerBytes[2]);
 		zlibData.push_back(adlerBytes[3]);
 
-		// Write IDAT
 		uint32_t idatLen = zlibData.size();
 		unsigned char lenBytes[4];
 		PngUtils::bigEndian(idatLen, lenBytes);
 		file.write((char*)lenBytes, 4);
 		file.write("IDAT", 4);
-		file.write((char*)&zlibData[0], zlibData.size()); // Assuming vector is contiguous
+		file.write((char*)&zlibData[0], zlibData.size());
 
-		// CRC
 		std::vector<unsigned char> crcBuffer;
 		crcBuffer.push_back('I'); crcBuffer.push_back('D'); crcBuffer.push_back('A'); crcBuffer.push_back('T');
 		crcBuffer.insert(crcBuffer.end(), zlibData.begin(), zlibData.end());
@@ -458,12 +399,10 @@ void	Graph::saveToPNG(const char *filename) const
 		file.write((char*)crcBytes, 4);
 	}
 
-	// 5. IEND Chunk
 	{
 		unsigned char lenBytes[4] = {0,0,0,0};
 		file.write((char*)lenBytes, 4);
 		file.write("IEND", 4);
-		// CRC for IEND (Type "IEND" only)
 		unsigned char crcData[] = {'I', 'E', 'N', 'D'};
 		uint32_t crc = PngUtils::crc32(crcData, 4);
 		unsigned char crcBytes[4];

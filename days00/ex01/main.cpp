@@ -4,14 +4,10 @@
 
 int main()
 {
-	// Creating a graph
-	// Size is now dynamic based on points added
 	Graph graph;
 
-	// Reading from file
 	std::cout << "Loading points from 'points.txt'..." << std::endl;
 	
-	// Create dummy file for demo
 	std::ofstream outfile("points.txt");
 	outfile << "0 0" << std::endl;
 	outfile << "2 2" << std::endl;
@@ -21,7 +17,6 @@ int main()
 
 	graph.readFromFile("points.txt");
 
-	// Add lines for demo
 	graph.addLine(Vector2(0, 0), Vector2(2, 2));
     graph.addLine(Vector2(2, 2), Vector2(6, 2));
     graph.addLine(Vector2(6, 2), Vector2(2, 3));
